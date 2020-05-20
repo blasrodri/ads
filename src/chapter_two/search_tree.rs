@@ -1,4 +1,5 @@
 use std::boxed::Box;
+use std::cmp::Ordering;
 
 #[derive(Clone, Debug)]
 struct BinarySearchTree<K, V> {
@@ -52,7 +53,7 @@ impl<K, V> From<(K, V)> for Edge<K, V> {
 
 impl<K, V> BinarySearchTree<K, V>
 where
-    K: Clone + PartialOrd + Eq,
+    K: Clone + PartialOrd + Eq + Ord,
     V: Clone + PartialOrd + Eq,
 {
     #[allow(dead_code)]
@@ -82,7 +83,7 @@ where
 
 impl<K, V> Edge<K, V>
 where
-    K: Clone + PartialOrd + Eq,
+    K: Clone + PartialOrd + Eq + Ord,
     V: Clone + PartialOrd + Eq,
 {
     fn insert(&mut self, key_to_insert: K, value_to_insert: V) {
@@ -92,20 +93,18 @@ where
                 Some(boxed_node) => match &mut **boxed_node {
                     Node {
                         key, left, right, ..
-                    } => {
-                        if key_to_insert == *key {
+                    } => match key_to_insert.cmp(key) {
+                        Ordering::Equal => {
                             *boxed_node = Box::new(Node {
                                 key: key.clone(),
                                 value: value_to_insert,
                                 left: left.clone(),
                                 right: right.clone(),
                             });
-                        } else if key_to_insert > *key {
-                            right.insert(key_to_insert, value_to_insert);
-                        } else {
-                            left.insert(key_to_insert, value_to_insert);
                         }
-                    }
+                        Ordering::Greater => right.insert(key_to_insert, value_to_insert),
+                        Ordering::Less => left.insert(key_to_insert, value_to_insert),
+                    },
                 },
             },
         }
