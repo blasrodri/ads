@@ -1,65 +1,113 @@
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::boxed::Box;
 
-#[derive(Debug)]
-struct BinaryTree<K, V> {
-    key: K,
-    element: V,
-    left: Option<Rc<RefCell<BinaryTree<K, V>>>>,
-    right: Option<Rc<RefCell<BinaryTree<K, V>>>>,
+#[derive(Clone, Debug)]
+struct BinarySearchTree<K, V> {
+    root: Option<Edge<K, V>>,
 }
 
-impl<K, V> BinaryTree<K, V> {
-    #[allow(dead_code)]
-    fn find(&self, key: K) -> Option<V>
-    where
-        K: Eq + PartialOrd + std::fmt::Debug,
-        V: Clone + std::fmt::Debug,
-    {
-        if self.key == key {
-            return Some(self.element.clone());
-        } else if self.key > key && self.left.is_some() {
-            let left = self.left.as_ref().unwrap().borrow();
-            return left.find(key);
-        } else if self.key < key && self.right.is_some() {
-            let right = self.right.as_ref().unwrap().borrow();
-            return right.find(key);
+#[derive(Clone, Debug)]
+struct Node<K, V> {
+    key: K,
+    value: V,
+    left: Edge<K, V>,
+    right: Edge<K, V>,
+}
+
+#[derive(Clone, Debug)]
+struct Edge<K, V> {
+    node: Option<Box<Node<K, V>>>,
+}
+
+impl<K, V> From<Node<K, V>> for Edge<K, V> {
+    fn from(node: Node<K, V>) -> Self {
+        Edge {
+            node: Some(Box::new(node)),
         }
-        None
+    }
+}
+
+impl<K, V> From<(K, V)> for Node<K, V> {
+    fn from(key_val: (K, V)) -> Self {
+        Node {
+            key: key_val.0,
+            value: key_val.1,
+            left: Edge { node: None },
+            right: Edge { node: None },
+        }
+    }
+}
+
+impl<K, V> From<(K, V)> for Edge<K, V> {
+    fn from(key_val: (K, V)) -> Self {
+        Edge {
+            node: Some(Box::new(Node {
+                key: key_val.0,
+                value: key_val.1,
+                left: Edge { node: None },
+                right: Edge { node: None },
+            })),
+        }
+    }
+}
+
+impl<K, V> BinarySearchTree<K, V>
+where
+    K: Clone + PartialOrd + Eq,
+    V: Clone + PartialOrd + Eq,
+{
+    #[allow(dead_code)]
+    fn new(maybe_node: Option<Node<K, V>>) -> BinarySearchTree<K, V> {
+        let root = match maybe_node {
+            None => None,
+            Some(node) => Some(Edge::from(node)),
+        };
+        BinarySearchTree { root }
     }
 
     #[allow(dead_code)]
-    fn insert(&mut self, key: K, value: V)
-    where
-        K: Eq + PartialOrd + std::fmt::Debug,
-        V: Clone + std::fmt::Debug,
-    {
-        if self.key == key {
-            self.element = value;
-        } else if self.key > key {
-            if self.left.is_some() {
-                let mut left = self.left.as_ref().unwrap().borrow_mut();
-                left.insert(key, value);
-            } else {
-                self.left = Some(Rc::new(RefCell::new(BinaryTree {
-                    key,
-                    element: value,
-                    left: None,
-                    right: None,
-                })));
-            }
-        } else if self.key < key {
-            if self.right.is_some() {
-                let mut right = self.right.as_ref().unwrap().borrow_mut();
-                right.insert(key, value);
-            } else {
-                self.right = Some(Rc::new(RefCell::new(BinaryTree {
-                    key,
-                    element: value,
-                    left: None,
-                    right: None,
-                })));
-            }
+    fn insert(&mut self, key_to_insert: K, value_to_insert: V) {
+        match self.root.as_mut() {
+            // There no root
+            None => self.root = Some(Edge::from((key_to_insert, value_to_insert))),
+            // There is a root
+            Some(edge) => match edge {
+                Edge { node: None } => {
+                    edge.node = Some(Box::new(Node::from((key_to_insert, value_to_insert))));
+                }
+                Edge { node: Some(_) } => edge.insert(key_to_insert, value_to_insert),
+            },
+        }
+    }
+}
+
+impl<K, V> Edge<K, V>
+where
+    K: Clone + PartialOrd + Eq,
+    V: Clone + PartialOrd + Eq,
+{
+    fn insert(&mut self, key_to_insert: K, value_to_insert: V) {
+        match self {
+            Edge { node } => match node {
+                None => *node = Some(Box::new(Node::from((key_to_insert, value_to_insert)))),
+                Some(boxed_node) => match &mut **boxed_node {
+                    Node {
+                        key, left, right, ..
+                    } => {
+                        if key_to_insert == *key {
+                            *boxed_node = Box::new(Node {
+                                key: key.clone(),
+                                value: value_to_insert,
+                                left: left.clone(),
+                                right: right.clone(),
+                            });
+                        } else if key_to_insert > *key {
+                            right.insert(key_to_insert, value_to_insert);
+                        } else {
+                            left.insert(key_to_insert, value_to_insert);
+                        }
+                    }
+                },
+            },
         }
     }
 }
@@ -69,54 +117,14 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_search_unavailable_key() {
-        let tree = BinaryTree {
-            key: 10,
-            element: "asd",
-            left: Some(Rc::new(RefCell::new(BinaryTree {
-                key: 4,
-                element: "askldjaslkdj",
-                left: None,
-                right: None,
-            }))),
-            right: None,
+    fn test_insert_nodes() {
+        let mut bt = BinarySearchTree {
+            root: Some(Edge::from((1, "asd"))),
         };
-        assert_eq!(tree.find(9), None);
-    }
-
-    #[test]
-    fn test_search_uvailable_keys() {
-        let tree = BinaryTree {
-            key: 10,
-            element: "asd",
-            left: Some(Rc::new(RefCell::new(BinaryTree {
-                key: 4,
-                element: "askl",
-                left: None,
-                right: None,
-            }))),
-            right: None,
-        };
-        assert_eq!(tree.find(10), Some("asd"));
-        assert_eq!(tree.find(4), Some("askl"));
-    }
-
-    #[test]
-    fn test_insert_key() {
-        let mut tree = BinaryTree {
-            key: 10,
-            element: "asd",
-            left: Some(Rc::new(RefCell::new(BinaryTree {
-                key: 4,
-                element: "askl",
-                left: None,
-                right: None,
-            }))),
-            right: None,
-        };
-        tree.insert(11, "1a1");
-        tree.insert(0, "0a");
-        assert_eq!(tree.find(11), Some("1a1"));
-        assert_eq!(tree.find(0), Some("0a"));
+        bt.insert(2, "BLA");
+        bt.insert(0, "123");
+        bt.insert(15, "@@@");
+        bt.insert(2, "BLAS");
+        dbg!(&bt);
     }
 }
