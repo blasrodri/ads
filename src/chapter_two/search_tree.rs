@@ -66,6 +66,14 @@ where
     }
 
     #[allow(dead_code)]
+    fn find(&self, key_to_find: K) -> Option<&V> {
+        match &self.root {
+            None => None,
+            Some(edge) => edge.find(key_to_find),
+        }
+    }
+
+    #[allow(dead_code)]
     fn insert(&mut self, key_to_insert: K, value_to_insert: V) {
         match self.root.as_mut() {
             // There no root
@@ -94,6 +102,24 @@ where
     K: Clone + PartialOrd + Eq + Ord + std::fmt::Debug,
     V: Clone + PartialOrd + Eq + std::fmt::Debug,
 {
+    #[allow(dead_code)]
+    fn find(&self, key_to_find: K) -> Option<&V> {
+        match &self.node {
+            None => None,
+            Some(boxed_node) => match &**boxed_node {
+                Node {
+                    key,
+                    value,
+                    left,
+                    right,
+                } => match key_to_find.cmp(&key) {
+                    Ordering::Equal => Some(value),
+                    Ordering::Less => left.find(key_to_find),
+                    Ordering::Greater => right.find(key_to_find),
+                },
+            },
+        }
+    }
     fn insert(&mut self, key_to_insert: K, value_to_insert: V) {
         match self {
             Edge { node } => match node {
@@ -442,5 +468,21 @@ mod test {
                 }),
             }
         );
+    }
+
+    #[test]
+    fn test_find_nodes() {
+        let bt = BinarySearchTree {
+            root: Some(Edge {
+                node: Some(Box::new(Node {
+                    key: 0,
+                    value: "123",
+                    left: Edge { node: None },
+                    right: Edge { node: None },
+                })),
+            }),
+        };
+        assert_eq!(bt.find(0), Some(&"123"));
+        assert_eq!(bt.find(1), None);
     }
 }
