@@ -369,7 +369,7 @@ where
 #[cfg(test)]
 mod test {
     use super::*;
-    use pretty_assertions::{assert_eq, assert_ne};
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn test_insert_nodes() {
@@ -429,6 +429,18 @@ mod test {
         bt.delete(2);
         bt.delete(15);
         bt.delete(1);
-        dbg!(&bt);
+        assert_eq!(
+            bt,
+            BinarySearchTree {
+                root: Some(Edge {
+                    node: Some(Box::new(Node {
+                        key: 0,
+                        value: "123",
+                        left: Edge { node: None },
+                        right: Edge { node: None }
+                    }))
+                }),
+            }
+        );
     }
 }
